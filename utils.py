@@ -110,3 +110,7 @@ def state2idx(state):
         factor *= j
 
     return idx
+
+def compute_admissible_actions(Constants):
+    #TODO: implement
+    return None
