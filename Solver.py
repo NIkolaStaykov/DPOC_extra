@@ -20,7 +20,6 @@
 
 import numpy as np
 from utils import *
-from ComputeTransitionProbabilities import compute_transition_probabilities
 
 
 def initialize_policy(constants: Constants) -> np.array:
@@ -35,7 +34,7 @@ def initialize_policy(constants: Constants) -> np.array:
     # # Random initial policy
     # for state in range(Constants.K):
     #     policy[state] = np.random.choice(list(admissible_actions[state]))
-    return np.zeros(constants.K)
+    return np.zeros(constants.K, dtype=int)
 
 
 def solution(P, Q, Constants):
@@ -71,6 +70,7 @@ def solution(P, Q, Constants):
     last_policy = np.ones(Constants.K) * -1
 
     while not np.all(policy == last_policy):
+        
         last_policy = policy.copy()
         # Update value function, policy is fixed
         old_value_func = value_func.copy()
@@ -79,9 +79,9 @@ def solution(P, Q, Constants):
         while delta > epsilon:
             for state in range(Constants.K):
                 action = policy[state]
-                state_cost = Q[state][action]
+                expected_stage_cost = Q[state][action]
                 transition_probs = P[state, :, action]
-                state_value = state_cost + np.dot(transition_probs, value_func)
+                state_value = expected_stage_cost + np.dot(transition_probs, value_func)
                 value_func[state] = state_value
 
             delta = np.max(np.abs(old_value_func - value_func))
