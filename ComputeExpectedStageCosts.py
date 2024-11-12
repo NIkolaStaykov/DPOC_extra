@@ -38,5 +38,8 @@ def compute_expected_stage_cost(Constants):
     Q = np.ones((Constants.K, Constants.L)) * np.inf
 
     # TODO fill the expected stage cost Q here
+    
+    
+    
 
     return Q
