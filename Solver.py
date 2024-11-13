@@ -21,6 +21,8 @@
 import numpy as np
 from utils import *
 
+from scipy.optimize import linprog
+
 
 def initialize_policy(constants: Constants) -> np.array:
     """Initializes the policy.
@@ -65,44 +67,36 @@ def solution(P, Q, Constants):
     # Constants
     policy = initialize_policy(Constants)
     value_func = np.zeros(Constants.K)
-
-    epsilon = 1e-3
-    last_policy = np.ones(Constants.K) * -1
-
-    while not np.all(policy == last_policy):
-        
-        last_policy = policy.copy()
-        # Update value function, policy is fixed
-        old_value_func = value_func.copy()
-        delta = np.inf
-
-        while delta > epsilon:
-            for state in range(Constants.K):
-                action = policy[state]
-                expected_stage_cost = Q[state][action]
-                transition_probs = P[state, :, action]
-                state_value = expected_stage_cost + np.dot(transition_probs, value_func)
-                value_func[state] = state_value
-
-            delta = np.max(np.abs(old_value_func - value_func))
-            old_value_func = value_func.copy()
-
-        # Update policy, value function is fixed
-        old_policy = np.ones(Constants.K) * -1
-        while not np.all(policy == old_policy):
-            old_policy = policy.copy()
-            for state in range(Constants.K):
-                best_action = None
-                best_value = -np.inf
-
-                for action in range(Constants.L):
-                    transition_probs = P[state, :, action]
-                    current_value = Q[state][action] + np.dot(transition_probs, value_func)
-                    if current_value > best_value:
-                        best_value = current_value
-                        best_action = action
-
-                policy[state] = best_action
+    
+    ######################################################################
+    # using linear programming
+    value_func = linear_program(P, Q, Constants)
 
     # The policy converged, it is now optimal
     return value_func, policy
+
+
+
+def linear_program(P: np.ndarray, Q: np.ndarray, const: Constants) -> np.ndarray:
+    
+    alpha = 0.99999
+    
+    Pt = np.transpose(P, (2, 0, 1))
+    
+    # unfold P along its third dimension
+    A = np.tile(np.eye(const.K), (const.L, 1)) - alpha * Pt.reshape((const.K * const.L, const.K))
+    
+    b = Q.flatten(order="F")
+    
+    # define the cost vector
+    c = np.ones(const.K) * -1
+    
+    # print(A.shape)
+    # print(b.shape)
+    # print(c.shape)
+    
+    # solve the linear program
+    res = linprog(c, A_ub=A, b_ub=b)
+    
+    return res.x
+    
