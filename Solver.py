@@ -64,7 +64,7 @@ def solution(P, Q, Constants):
     """
     # Constants
     policy = initialize_policy(Constants)
-    value_func = np.zeros(Constants.K)
+    cost_func = np.zeros(Constants.K)
 
     epsilon = 1e-3
     last_policy = np.ones(Constants.K) * -1
@@ -73,7 +73,7 @@ def solution(P, Q, Constants):
         
         last_policy = policy.copy()
         # Update value function, policy is fixed
-        old_value_func = value_func.copy()
+        old_cost_func = cost_func.copy()
         delta = np.inf
 
         while delta > epsilon:
@@ -81,28 +81,28 @@ def solution(P, Q, Constants):
                 action = policy[state]
                 expected_stage_cost = Q[state][action]
                 transition_probs = P[state, :, action]
-                state_value = expected_stage_cost + np.dot(transition_probs, value_func)
-                value_func[state] = state_value
+                state_cost = expected_stage_cost + np.dot(transition_probs, cost_func)
+                cost_func[state] = state_cost
 
-            delta = np.max(np.abs(old_value_func - value_func))
-            old_value_func = value_func.copy()
+            delta = np.max(np.abs(old_cost_func - cost_func))
+            old_cost_func = cost_func.copy()
 
-        # Update policy, value function is fixed
+        # Update policy, cost function is fixed
         old_policy = np.ones(Constants.K) * -1
         while not np.all(policy == old_policy):
             old_policy = policy.copy()
             for state in range(Constants.K):
                 best_action = None
-                best_value = -np.inf
+                best_cost = -np.inf
 
                 for action in range(Constants.L):
                     transition_probs = P[state, :, action]
-                    current_value = Q[state][action] + np.dot(transition_probs, value_func)
-                    if current_value > best_value:
-                        best_value = current_value
+                    current_cost = Q[state][action] + np.dot(transition_probs, cost_func)
+                    if current_cost < best_cost:
+                        best_cost = current_cost
                         best_action = action
 
                 policy[state] = best_action
 
     # The policy converged, it is now optimal
-    return value_func, policy
+    return cost_func, policy
