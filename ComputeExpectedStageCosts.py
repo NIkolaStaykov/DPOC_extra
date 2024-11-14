@@ -37,9 +37,15 @@ def compute_expected_stage_cost(Constants):
     """
     Q = np.ones((Constants.K, Constants.L)) * np.inf
 
+    # get the constants
+    M, N, K, L = Constants.M, Constants.N, Constants.K, Constants.L
+    start_pos, goal_pos = Constants.START_POS, Constants.GOAL_POS
+    static_drone_pos, input_space = Constants.DRONE_POS, Constants.INPUT_SPACE
+    current_prob, swan_prob = Constants.CURRENT_PROB, Constants.SWAN_PROB
+    flow_field = Constants.FLOW_FIELD
+    time_cost, thruster_cost, drone_cost = Constants.TIME_COST, Constants.THRUSTER_COST, Constants.DRONE_COST
+    
     # compute the indices of the respawn states
-    M, N = Constants.M, Constants.N
-    start_pos = Constants.START_POS
     respawn_idxs = np.array(
         [state2idx(np.array([start_pos[0], start_pos[1], k, l])) 
          for k in range(M) for l in range(N) 
@@ -53,7 +59,10 @@ def compute_expected_stage_cost(Constants):
         for action_idx in range(Constants.L):
             
             # compute the expected stage cost for the current state and action
-            expected_stage_cost = get_expected_stage_cost(state_idx, action_idx, respawn_idxs)
+            expected_stage_cost = get_expected_stage_cost(state_idx, action_idx, respawn_idxs,
+                                                    M, N, K, goal_pos, static_drone_pos, input_space,
+                                                    current_prob, swan_prob, flow_field,
+                                                    time_cost, thruster_cost, drone_cost)
             
             # write the expected stage cost to the matrix
             Q[state_idx, action_idx] = expected_stage_cost    
@@ -63,7 +72,10 @@ def compute_expected_stage_cost(Constants):
 
 
 ####################################################################################
-def get_expected_stage_cost(state_idx: int, action_idx: int, respawn_idxs: np.ndarray) -> float:
+def get_expected_stage_cost(state_idx: int, action_idx: int, respawn_idxs: np.ndarray,
+                            M: int, N: int, K: int, goal_coords: np.ndarray, obs_coords: np.ndarray,
+                            input_space: np.ndarray, current_prob: np.ndarray, swan_prob: float,
+                            flow_field: np.ndarray, time_cost, thruster_cost, drone_cost) -> float:
     """
     Computes the expected stage cost for a given state and action, across all possible next states.
 
@@ -75,13 +87,13 @@ def get_expected_stage_cost(state_idx: int, action_idx: int, respawn_idxs: np.nd
     """
     
     # get start and goal coordinates (2x1)
-    goal_coords = Constants.GOAL_POS
+    # goal_coords = Constants.GOAL_POS
     
     # get static drone (obs) coordinates (numpy array of shape (n_obs, 2))
-    obs_coords = Constants.DRONE_POS
+    # obs_coords = Constants.DRONE_POS
     
     # get input space of drone
-    input_space = Constants.INPUT_SPACE
+    # input_space = Constants.INPUT_SPACE
     
     # get current state coordinates for drone and swan
     state_coords = idx2state(state_idx)
@@ -104,41 +116,41 @@ def get_expected_stage_cost(state_idx: int, action_idx: int, respawn_idxs: np.nd
     # then, add onto the (running) correponsing transition probabilities
     
     # extract disturbance probabilities
-    current_prob = Constants.CURRENT_PROB[drone_coords[0], drone_coords[1]]
-    swan_prob = Constants.SWAN_PROB
+    current_prob = current_prob[drone_coords[0], drone_coords[1]]
+    # swan_prob = Constants.SWAN_PROB
     
     # extract costs
-    time_cost = Constants.TIME_COST
-    thruster_cost = Constants.THRUSTER_COST
-    drone_cost = Constants.DRONE_COST
+    # time_cost = Constants.TIME_COST
+    # thruster_cost = Constants.THRUSTER_COST
+    # drone_cost = Constants.DRONE_COST
     
     # compute drone and swan disturbances
-    drone_dist = Constants.FLOW_FIELD[drone_coords[0], drone_coords[1]]
+    drone_dist = flow_field[drone_coords[0], drone_coords[1]]
     swan_dist = compute_swan_movement(drone_coords, swan_coords)
     
     # case 1: no disturbances
     case1_prob = (1 - current_prob) * (1 - swan_prob)
     e_cost += get_e_cost_by_case(drone_coords, input_space, action_idx, swan_coords, obs_coords,
                               respawn_idxs, np.array([0, 0]), np.array([0, 0]), case1_prob,
-                              time_cost, thruster_cost, drone_cost)            
+                              time_cost, thruster_cost, drone_cost, K, M, N)            
     
     # case 2: drone disturbance, no swan movement
     case2_prob = (current_prob) * (1 - swan_prob)
     e_cost += get_e_cost_by_case(drone_coords, input_space, action_idx, swan_coords, obs_coords,
                               respawn_idxs, drone_dist, np.array([0, 0]), 
-                              case2_prob, time_cost, thruster_cost, drone_cost)
+                              case2_prob, time_cost, thruster_cost, drone_cost, K, M, N)
     
     # case 3: no drone disturbance, swan movement
     case3_prob = (1 - current_prob) * (swan_prob)
     e_cost += get_e_cost_by_case(drone_coords, input_space, action_idx, swan_coords, obs_coords,
                               respawn_idxs, np.array([0, 0]), swan_dist, case3_prob,
-                              time_cost, thruster_cost, drone_cost)
+                              time_cost, thruster_cost, drone_cost, K, M, N)
     
     # case 4: drone disturbance, swan movement
     case4_prob = (current_prob) * (swan_prob)
     e_cost += get_e_cost_by_case(drone_coords, input_space, action_idx, swan_coords, obs_coords,
                               respawn_idxs, drone_dist, swan_dist, 
-                              case4_prob, time_cost, thruster_cost, drone_cost)
+                              case4_prob, time_cost, thruster_cost, drone_cost, K, M, N)
     
     
     return e_cost
@@ -148,7 +160,7 @@ def get_expected_stage_cost(state_idx: int, action_idx: int, respawn_idxs: np.nd
 def get_e_cost_by_case(drone_coords: np.ndarray, input_space: np.ndarray, action_idx: int,
                      swan_coords: np.ndarray, obs_coords: np.ndarray, respawn_idxs: np.ndarray,
                      drone_dist: np.ndarray, swan_dist: np.ndarray, case_prob: float,
-                     time_cost, thruster_cost, drone_cost) -> np.ndarray:
+                     time_cost, thruster_cost, drone_cost, K: int, M: int, N: int) -> np.ndarray:
     """
     Computes the expected stage cost over all possible next states given a disturbance case.
     
@@ -159,15 +171,15 @@ def get_e_cost_by_case(drone_coords: np.ndarray, input_space: np.ndarray, action
         np.ndarray: The transition probabilities vector (to be added to the running total).
     """
     # initilalize the transition probabilities and stage costs for all possible next states
-    case_probs = np.zeros(Constants.K)
-    case_costs = np.zeros(Constants.K)
+    case_probs = np.zeros(K)
+    case_costs = np.zeros(K)
     
     # compute next state coordinates for drone and swan
     next_drone_coords = get_drone_coords(drone_coords, input_space[action_idx], drone_dist)
     next_swan_coords = get_swan_coords(swan_coords, swan_dist)
     
     # check if respawn is needed
-    if needs_respawn(drone_coords, next_drone_coords, next_swan_coords, obs_coords):
+    if needs_respawn(drone_coords, next_drone_coords, next_swan_coords, obs_coords, M, N):
         # respawn needed, add probability to all possible respawn states
         # respawn states = (drone in start cell) and (swan not in start cell)
         case_probs[respawn_idxs] = case_prob / len(respawn_idxs)

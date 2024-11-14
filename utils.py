@@ -132,19 +132,8 @@ def get_drone_coords(curr_drone_coords: np.ndarray, input: np.ndarray,
     Returns:
         np.ndarray: The next drone coordinates.
     """
-    # get current drone coordinates
-    x, y = curr_drone_coords
-    
-    # get input
-    ux, uy = input
-    
-    # get disturbance
-    wx, wy = disturbance
-    
-    # compute next drone coordinates
-    next_drone_coords = np.array([x + ux + wx, y + uy + wy])
-    
-    return next_drone_coords
+    return np.array([curr_drone_coords[0] + input[0] + disturbance[0],
+                     curr_drone_coords[1] + input[1] + disturbance[1]])
     
     
 ####################################################################################
@@ -158,21 +147,13 @@ def get_swan_coords(curr_swan_coords: np.ndarray, disturbance: np.ndarray) -> np
     Returns:
         np.ndarray: The next swan coordinates.
     """
-    # get current swan coordinates
-    x, y = curr_swan_coords
-    
-    # get disturbance
-    wx, wy = disturbance
-    
-    # compute next swan coordinates
-    next_swan_coords = np.array([x + wx, y + wy])
-    
-    return next_swan_coords
+    return np.array([curr_swan_coords[0] + disturbance[0],
+                     curr_swan_coords[1] + disturbance[1]])
 
 
 ####################################################################################
 def needs_respawn(curr_drone_coords: np.ndarray, next_drone_coords: np.ndarray, 
-                  next_swan_coords: np.ndarray, obs_coords: np.ndarray) -> bool:
+                  next_swan_coords: np.ndarray, obs_coords: np.ndarray, M: int, N: int) -> bool:
     """
     Checks if a new drone is needed for the given transition.
 
@@ -190,11 +171,10 @@ def needs_respawn(curr_drone_coords: np.ndarray, next_drone_coords: np.ndarray,
         return True
     
     # case 2: if drone goes out of bounds at next state, return True
-    if next_drone_coords[0] < 0 or next_drone_coords[0] >= Constants.M \
-        or next_drone_coords[1] < 0 or next_drone_coords[1] >= Constants.N:
+    if not (0 <= next_drone_coords[0] < M and 0 <= next_drone_coords[1] < N):
         return True
     
-    # case 3: if drone collides with static drone along path, return True
+    # case 3: if drone collides with static drone along path, return True        
     drone_path_coords = bresenham(curr_drone_coords, next_drone_coords)   # list of tuples
     for coord in obs_coords:
         if (coord[0], coord[1]) in drone_path_coords:

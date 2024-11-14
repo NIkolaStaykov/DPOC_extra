@@ -22,6 +22,7 @@ import numpy as np
 from utils import *
 
 from scipy.optimize import linprog
+from scipy.sparse import csr_matrix
 
 
 def initialize_policy(constants: Constants) -> np.array:
@@ -91,12 +92,10 @@ def linear_program(P: np.ndarray, Q: np.ndarray, const: Constants) -> np.ndarray
     # define the cost vector
     c = np.ones(const.K) * -1
     
-    # print(A.shape)
-    # print(b.shape)
-    # print(c.shape)
-    
     # solve the linear program
-    res = linprog(c, A_ub=A, b_ub=b)
+    # res = linprog(c, A_ub=A, b_ub=b)
+    # res = linprog(c, A_ub=A, b_ub=b, method="highs-ds")
+    res = linprog(c, A_ub=A, b_ub=b, method="highs-ipm")
     
     return res.x
     

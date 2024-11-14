@@ -25,6 +25,8 @@ from ComputeTransitionProbabilities import compute_transition_probabilities
 from Constants import Constants
 from Solver import solution
 
+from time import time
+
 if __name__ == "__main__":
     n_tests = 4
     for i in range(n_tests):
@@ -39,7 +41,9 @@ if __name__ == "__main__":
         file = np.load("tests/test" + str(i) + ".npz")
 
         # Begin tests
+        start = time()
         P = compute_transition_probabilities(Constants)
+        print("Time to compute transition probabilities: ", time() - start)
         if not np.all(
             np.logical_or(np.isclose(P.sum(axis=1), 1), np.isclose(P.sum(axis=1), 0))
         ):
@@ -47,7 +51,9 @@ if __name__ == "__main__":
                 "[ERROR] Transition probabilities do not sum up to 1 or 0 along axis 1!"
             )
 
+        start = time()
         Q = compute_expected_stage_cost(Constants)
+        print("Time to compute expected stage costs: ", time() - start)
         passed = True
         if not np.allclose(P, file["P"], rtol=1e-4, atol=1e-7):
             print("Wrong transition probabilities")
@@ -62,7 +68,9 @@ if __name__ == "__main__":
             print("Correct expected stage costs")
 
         # normal solution
+        start = time()
         [J_opt, u_opt] = solution(P, Q, Constants)
+        print("Time to compute optimal cost and policy: ", time() - start)
         if not np.allclose(J_opt, file["J"], rtol=1e-4, atol=1e-7):
             print("Wrong optimal cost")
             passed = False

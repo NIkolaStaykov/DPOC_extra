@@ -1,0 +1,78 @@
+-----------
+Test 0
+Time to compute transition probabilities:  0.27408814430236816
+Time to compute expected stage costs:  0.31281542778015137
+Correct transition probabilities
+Correct expected stage costs
+Time to compute optimal cost and policy:  0.18004798889160156
+Correct optimal cost
+-----------
+Test 1
+Time to compute transition probabilities:  0.6587491035461426
+Time to compute expected stage costs:  0.7513196468353271
+Correct transition probabilities
+Correct expected stage costs
+Time to compute optimal cost and policy:  0.764390230178833
+Correct optimal cost
+-----------
+Test 2
+Time to compute transition probabilities:  0.1280534267425537
+Time to compute expected stage costs:  0.11950302124023438
+Correct transition probabilities
+Correct expected stage costs
+Time to compute optimal cost and policy:  0.03113722801208496
+Correct optimal cost
+-----------
+Test 3
+Time to compute transition probabilities:  0.8466038703918457
+Time to compute expected stage costs:  0.934739351272583
+Correct transition probabilities
+Correct expected stage costs
+Time to compute optimal cost and policy:  1.1213610172271729
+Correct optimal cost
+-----------
+
+
+======================================================================================
+======================================================================================
+
+
+-----------
+Test 0
+Time to compute transition probabilities:  0.2823760509490967
+Time to compute expected stage costs:  0.31833434104919434
+Correct transition probabilities
+Correct expected stage costs
+Time to compute optimal cost and policy:  0.2040574550628662
+Correct optimal cost
+-----------
+Test 1
+Time to compute transition probabilities:  0.6869819164276123
+Time to compute expected stage costs:  0.7304883003234863
+Correct transition probabilities
+Correct expected stage costs
+Time to compute optimal cost and policy:  0.8320102691650391
+Correct optimal cost
+-----------
+Test 2
+Time to compute transition probabilities:  0.13104009628295898
+Time to compute expected stage costs:  0.11808609962463379
+Correct transition probabilities
+Correct expected stage costs
+Time to compute optimal cost and policy:  0.03399944305419922
+Correct optimal cost
+-----------
+Test 3
+Time to compute transition probabilities:  0.8456659317016602
+Time to compute expected stage costs:  0.892333984375
+Correct transition probabilities
+Correct expected stage costs
+Time to compute optimal cost and policy:  1.2283124923706055
+Correct optimal cost
+-----------
+
+
+======================================================================================
+======================================================================================
+
+
