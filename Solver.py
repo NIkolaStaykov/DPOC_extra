@@ -77,7 +77,6 @@ def solution(P, Q, Constants):
     return value_func, policy
 
 
-
 def linear_program(P: np.ndarray, Q: np.ndarray, const: Constants) -> np.ndarray:
     
     alpha = 0.99999
@@ -93,8 +92,6 @@ def linear_program(P: np.ndarray, Q: np.ndarray, const: Constants) -> np.ndarray
     c = np.ones(const.K) * -1
     
     # solve the linear program
-    # res = linprog(c, A_ub=A, b_ub=b)
-    # res = linprog(c, A_ub=A, b_ub=b, method="highs-ds")
     res = linprog(c, A_ub=A, b_ub=b, method="highs-ipm")
     
     return res.x

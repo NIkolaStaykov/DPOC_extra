@@ -20,6 +20,10 @@
 import numpy as np
 from utils import *
 
+PRECOMPUTE_DONE = False
+PROBLEM_HASH = None
+prob_cost_dict = {}
+
 
 def compute_expected_stage_cost(Constants):
     """Computes the expected stage cost for the given problem.
@@ -36,8 +40,6 @@ def compute_expected_stage_cost(Constants):
         np.array: Expected stage cost Q of shape (K,L)
     """
     Q = np.ones((Constants.K, Constants.L)) * np.inf
-
-    # get the constants
     M, N, K, L = Constants.M, Constants.N, Constants.K, Constants.L
     start_pos, goal_pos = Constants.START_POS, Constants.GOAL_POS
     static_drone_pos, input_space = Constants.DRONE_POS, Constants.INPUT_SPACE
@@ -45,12 +47,15 @@ def compute_expected_stage_cost(Constants):
     flow_field = Constants.FLOW_FIELD
     time_cost, thruster_cost, drone_cost = Constants.TIME_COST, Constants.THRUSTER_COST, Constants.DRONE_COST
     
+
     # compute the indices of the respawn states
-    respawn_idxs = np.array(
-        [state2idx(np.array([start_pos[0], start_pos[1], k, l])) 
-         for k in range(M) for l in range(N) 
-         if (k, l) != (start_pos[0], start_pos[1])]
-    )
+    swan_spawn_pos = np.ones((M, N))
+    swan_spawn_pos[start_pos[0], start_pos[1]] = 0
+
+    start_idx_grid = start_pos[0] + start_pos[1] * M
+    respawn_idxs = np.arange(0, start_idx_grid)
+    respawn_idxs = np.append(respawn_idxs, np.arange(start_idx_grid + 1, M * N))
+    respawn_idxs = respawn_idxs*M*N + start_idx_grid
     
     # loop through all state indexes
     for state_idx in range(Constants.K):

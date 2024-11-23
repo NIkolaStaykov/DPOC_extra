@@ -48,12 +48,12 @@ def compute_transition_probabilities(Constants):
     flow_field = Constants.FLOW_FIELD
     
     # compute the indices of the respawn states
-    
-    respawn_idxs = np.array(
-        [state2idx(np.array([start_pos[0], start_pos[1], k, l])) 
-         for k in range(M) for l in range(N) 
-         if (k, l) != (start_pos[0], start_pos[1])]
-    )
+    M, N = Constants.M, Constants.N
+    start_pos = Constants.START_POS
+    start_idx_grid = start_pos[0] + start_pos[1] * M
+    respawn_idxs = np.arange(0, start_idx_grid)
+    respawn_idxs = np.append(respawn_idxs, np.arange(start_idx_grid + 1, M * N))
+    respawn_idxs = respawn_idxs * M * N + start_idx_grid
     
     # loop through all state indexes
     for state_idx in range(K):
