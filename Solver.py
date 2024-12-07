@@ -22,7 +22,6 @@ import numpy as np
 from utils import *
 
 from scipy.optimize import linprog
-from scipy.sparse import csr_matrix
 
 
 def initialize_policy(constants: Constants) -> np.array:
@@ -69,9 +68,26 @@ def solution(P, Q, Constants):
     policy = initialize_policy(Constants)
     value_func = np.zeros(Constants.K)
     
-    ######################################################################
-    # using linear programming
+    # find optimal cost using linear programming
     value_func = linear_program(P, Q, Constants)
+    
+    # find optimal optimal directly from the expected state costs
+    right_term = np.dot(value_func, P)
+    P_transposed = np.transpose(P, (1, 0, 2))
+    right_term = np.dot(value_func, P_transposed)
+    # right_term = value_func @ P_transposed
+    # print(right_term.shape)
+    costs = Q + right_term
+    
+    # find the optimal policy
+    # input_space = Constants.INPUT_SPACE
+    # for i in range(Constants.K):
+    #     policy_idx = np.argmin(costs[i])
+    #     policy[i] = input_space[policy_idx]
+        
+    policy = np.argmin(costs, axis=1)
+    
+    # policy = np.argmin(Q, axis=1)
 
     # The policy converged, it is now optimal
     return value_func, policy
@@ -79,20 +95,25 @@ def solution(P, Q, Constants):
 
 def linear_program(P: np.ndarray, Q: np.ndarray, const: Constants) -> np.ndarray:
     
+    # define the discount factor
     alpha = 0.99999
     
+    # re-order the dimensions of the transition probabiltiies matrix
     Pt = np.transpose(P, (2, 0, 1))
     
     # unfold P along its third dimension
     A = np.tile(np.eye(const.K), (const.L, 1)) - alpha * Pt.reshape((const.K * const.L, const.K))
+    # A = csr_matrix(np.tile(np.eye(const.K), (const.L, 1)) - alpha * Pt.reshape((const.K * const.L, const.K)))
     
+    # flatten the expected stage costs matrix
     b = Q.flatten(order="F")
     
-    # define the cost vector
+    # define the cost vector to optimize
     c = np.ones(const.K) * -1
     
     # solve the linear program
     res = linprog(c, A_ub=A, b_ub=b, method="highs-ipm")
+    
     
     return res.x
     

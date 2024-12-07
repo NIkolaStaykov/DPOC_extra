@@ -79,6 +79,17 @@ if __name__ == "__main__":
             passed = False
         else:
             print("Correct optimal cost")
+        
+        # check optimal policy
+        # print(u_opt)
+        # print(file["u"])
+        # count number of different elements
+        print(np.sum(u_opt != file["u"]))
+        if not np.allclose(u_opt, file["u"], rtol=1e-4, atol=1e-7):
+            print("Wrong optimal policy")
+            passed = False
+        else:
+            print("Correct optimal policy")
 
     print("-----------")
     print(f"Total times: {total_times}")
