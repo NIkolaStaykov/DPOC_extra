@@ -69,34 +69,25 @@ def solution(P, Q, Constants):
     value_func = np.zeros(Constants.K)
     
     # find optimal cost using linear programming
-    value_func = linear_program(P, Q, Constants)
-    
-    # find optimal optimal directly from the expected state costs
-    right_term = np.dot(value_func, P)
-    P_transposed = np.transpose(P, (1, 0, 2))
-    right_term = np.dot(value_func, P_transposed)
-    # right_term = value_func @ P_transposed
-    # print(right_term.shape)
-    costs = Q + right_term
+    alpha = 0.99999       # discount factor
+    value_func = linear_program(P, Q, Constants, alpha)
     
     # find the optimal policy
-    # input_space = Constants.INPUT_SPACE
-    # for i in range(Constants.K):
-    #     policy_idx = np.argmin(costs[i])
-    #     policy[i] = input_space[policy_idx]
-        
+    P_transposed = np.transpose(P, (0, 2, 1))
+    costs = Q + alpha * (P_transposed @ value_func)
+    
     policy = np.argmin(costs, axis=1)
     
-    # policy = np.argmin(Q, axis=1)
+    row_mins = np.min(costs, axis=1)
+    multiple_minima_rows = np.sum((costs == row_mins[:, None]), axis=1) > 1
+    num_rows_with_multiple_minima = np.sum(multiple_minima_rows)
+    print(f"Number of state with multiple optimal policies: {num_rows_with_multiple_minima}")
 
     # The policy converged, it is now optimal
     return value_func, policy
 
 
-def linear_program(P: np.ndarray, Q: np.ndarray, const: Constants) -> np.ndarray:
-    
-    # define the discount factor
-    alpha = 0.99999
+def linear_program(P: np.ndarray, Q: np.ndarray, const: Constants, alpha: float) -> np.ndarray:
     
     # re-order the dimensions of the transition probabiltiies matrix
     Pt = np.transpose(P, (2, 0, 1))
