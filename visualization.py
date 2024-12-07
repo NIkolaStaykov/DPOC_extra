@@ -73,22 +73,24 @@ def update_plots(swan_x, swan_y):
     robot_positions = STATE_SPACE[swan_positions][:, :2]
     robot_indices = np.where(swan_positions)[0]
 
+    # Indexing is (y, x) for J (we display it as a image)
     J_opt_grid = np.full((N, M), np.nan)  # Use np.nan to mask positions
-    u_opt_grid = np.full((N, M, 2), np.nan)
+    u_opt_grid = np.full((M, N, 2), np.nan)
 
     # Fill in the cost-to-go and optimal policy for each robot position
     for idx, pos in zip(robot_indices, robot_positions):
         x, y = pos  # x and y positions of the robot
         if 0 <= x < M and 0 <= y < N:
+            # Indexing is (y, x) for J (we display it as a image)
             J_opt_grid[y, x] = J_opt[idx]
-            u_opt_grid[y, x, :] = Constants.INPUT_SPACE[u_opt[idx]]
+            u_opt_grid[x, y, :] = Constants.INPUT_SPACE[u_opt[idx]]
 
     # Mask the static drone positions
     for drone_pos in DRONE_POS:
         x, y = drone_pos
         if 0 <= x < M and 0 <= y < N:
             J_opt_grid[y, x] = np.nan  # Mask the cost-to-go value
-            u_opt_grid[y, x, :] = np.nan  # Mask the control input
+            u_opt_grid[x, y, :] = np.nan  # Mask the control input
 
     # Remove existing colorbar if any
     if cbar is not None:
@@ -114,6 +116,7 @@ def update_plots(swan_x, swan_y):
     cbar = fig.colorbar(im, ax=ax)
 
     # Plot start, goal, drones, and swan positions
+    # ax.scatter uses (x, y) coordinates, hence the indexing is (x, y)
     ax.scatter(
         START_POS[0], START_POS[1], color="green", s=100, label="Start", zorder=3
     )
@@ -128,7 +131,8 @@ def update_plots(swan_x, swan_y):
     )
     ax.scatter(swan_x, swan_y, color="purple", s=100, label="Swan", zorder=3)
 
-    X, Y = np.meshgrid(np.arange(M), np.arange(N))
+    # u_opt_grid and FLOW_FIELD are indexed as matrices
+    X, Y = np.meshgrid(np.arange(M), np.arange(N), indexing="ij")
 
     u_x = u_opt_grid[:, :, 0]
     u_y = u_opt_grid[:, :, 1]
