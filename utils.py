@@ -176,11 +176,9 @@ def needs_respawn(curr_drone_coords: np.ndarray, next_drone_coords: np.ndarray,
     
     # case 3: if drone collides with static drone along path, return True        
     drone_path_coords = bresenham(curr_drone_coords, next_drone_coords)   # list of tuples
-    for coord in obs_coords:
-        if (coord[0], coord[1]) in drone_path_coords:
-            return True
-    
-    return False
+    drone_path_set = set(drone_path_coords)
+    obs_coords_set = set(map(tuple, obs_coords))
+    return len(drone_path_set.intersection(obs_coords_set)) > 0
 
 
 ####################################################################################
