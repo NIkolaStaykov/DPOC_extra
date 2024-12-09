@@ -75,26 +75,18 @@ def compute_expected_stage_cost(Constants):
     Returns:
         np.array: Expected stage cost Q of shape (K,L)
     """
-    if os.path.exists('Q.npy'):
-        start = time.time()
-        print("Exists!!!!!")
-        Q = np.load('Q.npy')
-        os.remove('Q.npy')
-        os.remove('P.npy')
-        print("Time taken to load Q.npy: ", time.time() - start)
-        return Q
-    else:
+    values = SingletonClass()
+    if values.value is None:
         start = time.time()
         P, Q = compute_probs_and_costs(Constants)
-        np.save('Q.npy', Q)
-        np.save('P.npy', P)
-        print("Time taken to compute Q.npy: ", time.time() - start)
+        print("Time taken to compute P and Q: ", time.time() - start)
+        values.set_value((P, Q))
+        return P
+    else:
+        Q = values.value[1]
+        values.value = None
         return Q
     
-    
-
-
-
 ####################################################################################
 def get_expected_stage_cost_and_transition_probs(state_idx: int, action_idx: int, respawn_idxs: np.ndarray,
                             M: int, N: int, K: int, goal_coords: np.ndarray, obs_coords: np.ndarray,
@@ -109,15 +101,6 @@ def get_expected_stage_cost_and_transition_probs(state_idx: int, action_idx: int
     Returns:
         float: The expected stage cost
     """
-    
-    # get start and goal coordinates (2x1)
-    # goal_coords = Constants.GOAL_POS
-    
-    # get static drone (obs) coordinates (numpy array of shape (n_obs, 2))
-    # obs_coords = Constants.DRONE_POS
-    
-    # get input space of drone
-    # input_space = Constants.INPUT_SPACE
     
     # get current state coordinates for drone and swan
     state_coords = idx2state(state_idx)
@@ -142,12 +125,6 @@ def get_expected_stage_cost_and_transition_probs(state_idx: int, action_idx: int
     
     # extract disturbance probabilities
     current_prob = current_prob[drone_coords[0], drone_coords[1]]
-    # swan_prob = Constants.SWAN_PROB
-    
-    # extract costs
-    # time_cost = Constants.TIME_COST
-    # thruster_cost = Constants.THRUSTER_COST
-    # drone_cost = Constants.DRONE_COST
     
     # compute drone and swan disturbances
     drone_dist = flow_field[drone_coords[0], drone_coords[1]]
@@ -214,7 +191,6 @@ def get_e_cost_and_probs_by_case(drone_coords: np.ndarray, input_space: np.ndarr
     # check if respawn is needed
     if needs_respawn(drone_coords, next_drone_coords, next_swan_coords, obs_coords, M, N):
         # respawn needed, add probability to all possible respawn states
-        # respawn states = (drone in start cell) and (swan not in start cell)
         case_probs[respawn_idxs] = case_prob / len(respawn_idxs)
         case_costs[respawn_idxs] = compute_stage_cost(time_cost, thruster_cost, drone_cost, action_idx, 1)
     else:

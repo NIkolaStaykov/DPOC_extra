@@ -39,57 +39,16 @@ def compute_transition_probabilities(Constants):
     Returns:
         np.array: Transition probability matrix of shape (K,K,L).
     """
-    if os.path.exists('P.npy'):
-        start = time.time()
-        print("Exists!!!!!")
-        P = np.load('P.npy')
-        os.remove('Q.npy')
-        os.remove('P.npy')
-        print("Time taken to load P.npy: ", time.time() - start)
+    # Create a singleton class to store the instance
+    values = SingletonClass()
+    if values.value is None:
+        P, Q = compute_probs_and_costs(Constants)
+        values.set_value((P, Q))
         return P
     else:
-        start = time.time()
-        P, Q = compute_probs_and_costs(Constants)
-        np.save('Q.npy', Q)
-        np.save('P.npy', P)
-        print("Time taken to compute P.npy: ", time.time() - start)
+        P = values.value[0]
+        values.value = None
         return P
-
-#     P = np.zeros((Constants.K, Constants.K, Constants.L))
-    
-#     # print_constants(Constants)
-    
-#     # get the constants
-#     M, N, K, L = Constants.M, Constants.N, Constants.K, Constants.L
-#     start_pos, goal_pos = Constants.START_POS, Constants.GOAL_POS
-#     static_drone_pos, input_space = Constants.DRONE_POS, Constants.INPUT_SPACE
-#     current_prob, swan_prob = Constants.CURRENT_PROB, Constants.SWAN_PROB
-#     flow_field = Constants.FLOW_FIELD
-    
-#     # compute the indices of the respawn states
-#     start_idx_grid = start_pos[0] + start_pos[1] * M
-#     respawn_idxs = np.delete(np.arange(M * N), start_idx_grid)
-#     respawn_idxs = respawn_idxs * M * N + start_idx_grid
-    
-#     # loop through all state indexes
-#     for state_idx in range(K):
-
-#         # loop through all admissble actions
-#         for action_idx in range(L):
-            
-#             # compute the list of probabilities for all possible next states
-#             next_state_probs = get_transition_probs(state_idx, action_idx, respawn_idxs,
-#                                                     M, N, K, goal_pos, static_drone_pos, input_space,
-#                                                     current_prob, swan_prob, flow_field)
-            
-#             # write the probabilities to the transition matrix
-#             P[state_idx, :, action_idx] = next_state_probs
-    
-#     return P
-
-
-
-
 
 ####################################################################################
 def get_transition_probs(state_idx: int, action_idx: int, respawn_idxs: np.ndarray,
