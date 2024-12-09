@@ -17,11 +17,7 @@
  --
 """
 
-import numpy as np
 from utils import *
-from ComputeExpectedStageCosts import compute_probs_and_costs
-import time
-import os
 
 ####################################################################################
 def compute_transition_probabilities(Constants):
@@ -39,6 +35,7 @@ def compute_transition_probabilities(Constants):
     Returns:
         np.array: Transition probability matrix of shape (K,K,L).
     """
+    
     # Create a singleton class to store the instance
     values = SingletonClass()
     if values.value is None:

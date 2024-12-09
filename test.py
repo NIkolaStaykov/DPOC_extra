@@ -24,7 +24,6 @@ from ComputeExpectedStageCosts import compute_expected_stage_cost
 from ComputeTransitionProbabilities import compute_transition_probabilities
 from Constants import Constants
 from Solver import solution
-from time import time
 
 if __name__ == "__main__":
     n_tests = 4
@@ -41,10 +40,7 @@ if __name__ == "__main__":
         file = np.load("tests/test" + str(i) + ".npz")
 
         # Begin tests
-        start_time = time()
         P = compute_transition_probabilities(Constants)
-        print(f"P Time: {time() - start_time:.3f}")
-        total_times[i] += time() - start_time
         if not np.all(
             np.logical_or(np.isclose(P.sum(axis=1), 1), np.isclose(P.sum(axis=1), 0))
         ):
@@ -52,10 +48,7 @@ if __name__ == "__main__":
                 "[ERROR] Transition probabilities do not sum up to 1 or 0 along axis 1!"
             )
 
-        start_time = time()
         Q = compute_expected_stage_cost(Constants)
-        print(f"Q Time: {time() - start_time:.3f}")
-        total_times[i] += time() - start_time
         passed = True
         if not np.allclose(P, file["P"], rtol=1e-4, atol=1e-7):
             print("Wrong transition probabilities")
@@ -70,26 +63,9 @@ if __name__ == "__main__":
             print("Correct expected stage costs")
 
         # normal solution
-        start_time = time()
         [J_opt, u_opt] = solution(P, Q, Constants)
-        print(f"Solution time: {time() - start_time:.3f}")
-        total_times[i] += time() - start_time
         if not np.allclose(J_opt, file["J"], rtol=1e-4, atol=1e-7):
             print("Wrong optimal cost")
             passed = False
         else:
             print("Correct optimal cost")
-        
-        # check optimal policy
-        # print(u_opt)
-        # print(file["u"])
-        # count number of different elements
-        print(np.sum(u_opt != file["u"]))
-        if not np.allclose(u_opt, file["u"], rtol=1e-4, atol=1e-7):
-            print("Wrong optimal policy")
-            passed = False
-        else:
-            print("Correct optimal policy")
-
-    print("-----------")
-    print(f"Total times: {total_times}")

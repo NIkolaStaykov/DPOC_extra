@@ -20,6 +20,8 @@
 import numpy as np
 from Constants import Constants
 
+from scipy.optimize import linprog
+
 def bresenham(start, end):
     """
     Generates the coordinates of a line between two points using Bresenham's algorithm.
@@ -118,50 +120,218 @@ def state2idx(state):
 ##################################################################
 
 
+####################################################################################
+def linear_program(P: np.ndarray, Q: np.ndarray, const: Constants, alpha: float) -> np.ndarray:
+    """
+    Solves the linear program to find the optimal cost-to-go function for the stochastic shortest path problem.
+    
+    Args:
+        P: The transition probabilities matrix.
+        Q: The expected stage costs matrix.
+        const: The constants describing the problem instance.
+        alpha: The discount factor.
+    
+    Returns:
+        np.ndarray: The optimal cost-to-go function.
+    """
+    
+    # re-order the dimensions of the transition probabiltiies matrix
+    Pt = np.transpose(P, (2, 0, 1))
+    
+    # unfold P along its third dimension
+    A = np.tile(np.eye(const.K), (const.L, 1)) - alpha * Pt.reshape((const.K * const.L, const.K))
+    
+    # flatten the expected stage costs matrix
+    b = Q.flatten(order="F")
+    
+    # define the cost vector to optimize
+    c = np.ones(const.K) * -1
+    
+    # solve the linear program
+    res = linprog(c, A_ub=A, b_ub=b, method="highs-ipm")
+    
+    return res.x
+
 
 ####################################################################################
-def get_drone_coords(curr_drone_coords: np.ndarray, input: np.ndarray, 
-                     disturbance: np.ndarray) -> np.ndarray:
+def compute_probs_and_costs(const: Constants) -> [np.ndarray, np.ndarray]:
     """
-    Computes the next drone coordinates based on the current drone coordinates, the input and the disturbance.
+    Computes the transition probabilities and expected stage costs matrices for all states and actions.
 
     Args:
-        curr_drone_coords (np.ndarray): The current drone coordinates.
-        input (np.ndarray): The input to be executed
-        disturbance (np.ndarray): The disturbance to be applied
+        const (Constants): The constants of the problem.
     Returns:
-        np.ndarray: The next drone coordinates.
+        np.ndarray: The transition probabilities matrix.
+        np.ndarray: The expected stage costs matrix.
     """
-    return np.array([curr_drone_coords[0] + input[0] + disturbance[0],
-                     curr_drone_coords[1] + input[1] + disturbance[1]])
     
+    P = np.zeros((const.K, const.K, const.L))
+    # Q = np.ones((const.K, const.L)) * np.inf
+    Q = np.zeros((const.K, const.L))
     
+    start_pos = const.START_POS
+
+    # Precompute the indices of the respawn states
+    swan_spawn_pos = np.ones((const.M, const.N))
+    swan_spawn_pos[start_pos[0], start_pos[1]] = 0
+
+    start_idx_grid = start_pos[0] + start_pos[1] * const.M
+    respawn_idxs = np.concatenate((np.arange(0, start_idx_grid), np.arange(start_idx_grid + 1, const.M * const.N))) * const.M * const.N + start_idx_grid
+
+    # Loop through all state indexes
+    for state_idx in range(const.K):
+        # Loop through all admissible actions
+        for action_idx in range(const.L):
+            
+            # get action
+            action = const.INPUT_SPACE[action_idx]
+            
+            # Compute the expected stage cost for the current state and action
+            expected_stage_cost, next_state_probs = get_expected_stage_cost_and_transition_probs(
+                const, state_idx, action, respawn_idxs
+            )
+
+            # Write the expected stage cost to the matrix
+            Q[state_idx, action_idx] = expected_stage_cost
+            P[state_idx, :, action_idx] = next_state_probs
+
+    return P, Q
+
+
 ####################################################################################
-def get_swan_coords(curr_swan_coords: np.ndarray, disturbance: np.ndarray) -> np.ndarray:
+def get_expected_stage_cost_and_transition_probs(const: Constants, state_idx: int, action: np.ndarray,
+                                                 respawn_idxs: np.ndarray) -> [float, np.ndarray]:
     """
-    Computes the next swan coordinates based on the current swan coordinates and the disturbance.
+    Computes the expected stage cost for a given state and action, across all possible next states.
 
     Args:
-        curr_swan_coords (np.ndarray): The current swan coordinates.
-        disturbance (np.ndarray): The disturbance to be applied
+        const (Constants): The constants of the problem.
+        state_idx (int): The current state index.
+        action (np.ndarray): The action input of the drone.
+        respawn_idxs (np.ndarray): The indices of the respawn states.
     Returns:
-        np.ndarray: The next swan coordinates.
+        float: The expected stage cost.
+        np.ndarray: The transition probabilities vector to all possible next states.
     """
-    return np.array([curr_swan_coords[0] + disturbance[0],
-                     curr_swan_coords[1] + disturbance[1]])
+    
+    # Get current state coordinates for drone and swan
+    state_coords = idx2state(state_idx)
+    drone_coords = state_coords[:2].astype(int)
+    swan_coords = state_coords[2:].astype(int)
+    
+    # Initialize the expected stage cost to zero
+    e_cost = 0.0
+    transition_probs = np.zeros(const.K)
+    
+    # Undefined states: same cell as swan, as static drone
+    if np.all(drone_coords == swan_coords) or np.all(drone_coords == const.DRONE_POS, axis=1).any():
+        return e_cost, transition_probs
+    
+    # If in goal (and swan not in goal), stay in goal (keep current state) with probability 1
+    if np.all(drone_coords == const.GOAL_POS):
+        return e_cost, transition_probs
+
+    # 4 possibilities for disturbances: {}, {drone}, {swan}, {drone, swan}
+    # For each, compute the next states, and check if new drone is needed
+    # Then, add onto the (running) corresponding transition probabilities
+    
+    # Extract disturbance probabilities
+    current_prob = const.CURRENT_PROB[drone_coords[0], drone_coords[1]]
+    
+    # Compute drone and swan disturbances
+    drone_dist = const.FLOW_FIELD[drone_coords[0], drone_coords[1]]
+    swan_dist = compute_swan_movement(drone_coords, swan_coords)
+    
+    # Case 1: no disturbances
+    case1_prob = (1 - current_prob) * (1 - const.SWAN_PROB)
+    cost, probs = get_e_cost_and_probs_by_case(const, drone_coords, action, swan_coords,
+                              respawn_idxs, np.array([0, 0]), np.array([0, 0]), case1_prob)            
+    e_cost += cost
+    transition_probs += probs
+
+    # Case 2: drone disturbance, no swan movement
+    case2_prob = (current_prob) * (1 - const.SWAN_PROB)
+    cost, probs = get_e_cost_and_probs_by_case(const, drone_coords, action, swan_coords,
+                              respawn_idxs, drone_dist, np.array([0, 0]), case2_prob)
+    e_cost += cost
+    transition_probs += probs
+    
+    # Case 3: no drone disturbance, swan movement
+    case3_prob = (1 - current_prob) * (const.SWAN_PROB)
+    cost, probs = get_e_cost_and_probs_by_case(const, drone_coords, action, swan_coords,
+                              respawn_idxs, np.array([0, 0]), swan_dist, case3_prob)
+    e_cost += cost
+    transition_probs += probs
+    
+    # Case 4: drone disturbance, swan movement
+    case4_prob = (current_prob) * (const.SWAN_PROB)
+    cost, probs = get_e_cost_and_probs_by_case(const, drone_coords, action, swan_coords,
+                              respawn_idxs, drone_dist, swan_dist, case4_prob)
+    e_cost += cost
+    transition_probs += probs
+    
+    return e_cost, transition_probs
 
 
 ####################################################################################
-def needs_respawn(curr_drone_coords: np.ndarray, next_drone_coords: np.ndarray, 
-                  next_swan_coords: np.ndarray, obs_coords: np.ndarray, M: int, N: int) -> bool:
+def get_e_cost_and_probs_by_case(const: Constants, drone_coords: np.ndarray, action: np.ndarray,
+                     swan_coords: np.ndarray, respawn_idxs: np.ndarray, drone_dist: np.ndarray, 
+                     swan_dist: np.ndarray, case_prob: float) -> [float, np.ndarray]:
+    """
+    Computes the expected stage cost over all possible next states given a disturbance case.
+    
+    Args:
+        const (Constants): The constants of the problem.
+        drone_coords (np.ndarray): The current drone coordinates.
+        action (np.ndarray): The action input of the drone.
+        swan_coords (np.ndarray): The current swan coordinates.
+        respawn_idxs (np.ndarray): The indices of the respawn states.
+        drone_dist (np.ndarray): The drone disturbance.
+        swan_dist (np.ndarray): The swan disturbance.
+        case_prob (float): The disturbance case probability.
+    Returns:
+        float: The expected stage cost.
+        np.ndarray: The transition probabilities vector (to be added to the running total).
+    """
+    # Initialize the transition probabilities and stage costs for all possible next states
+    case_probs = np.zeros(const.K)
+    case_costs = np.zeros(const.K)
+    
+    # Compute next state coordinates for drone and swan
+    next_drone_coords = np.array([drone_coords[0] + action[0] + drone_dist[0], 
+                                  drone_coords[1] + action[1] + drone_dist[1]])
+    next_swan_coords = np.array([swan_coords[0] + swan_dist[0], 
+                                 swan_coords[1] + swan_dist[1]])
+    
+    # Check if respawn is needed
+    if needs_respawn(const, drone_coords, next_drone_coords, next_swan_coords):
+        # Respawn needed, add probability to all possible respawn states
+        case_probs[respawn_idxs] = case_prob / len(respawn_idxs)
+        case_costs[respawn_idxs] = const.TIME_COST + const.THRUSTER_COST * np.abs(action).sum() + const.DRONE_COST
+    else:
+        # Respawn not needed, compute next state index
+        next_state_idx = state2idx(np.concatenate((next_drone_coords, next_swan_coords)))
+        # Add onto transition probability
+        case_probs[next_state_idx] += case_prob
+        case_costs[next_state_idx] = const.TIME_COST + const.THRUSTER_COST * np.abs(action).sum()
+    
+    # Compute expected stage cost
+    case_e_cost = np.dot(case_probs, case_costs)
+    
+    return case_e_cost, case_probs
+
+
+####################################################################################
+def needs_respawn(const: Constants, curr_drone_coords: np.ndarray, next_drone_coords: np.ndarray, 
+                  next_swan_coords: np.ndarray) -> bool:
     """
     Checks if a new drone is needed for the given transition.
 
     Args:
+        const (Constants): The constants of the problem.
         curr_drone_coords (np.ndarray): The current drone coordinates.
         next_drone_coords (np.ndarray): The next drone coordinates.
         next_swan_coords (np.ndarray): The next swan coordinates.
-        obs_coords (np.ndarray): The coordinates of the static drones.
     Returns:
         bool: True if a new drone is needed, False otherwise.
     """
@@ -171,13 +341,13 @@ def needs_respawn(curr_drone_coords: np.ndarray, next_drone_coords: np.ndarray,
         return True
     
     # case 2: if drone goes out of bounds at next state, return True
-    if not (0 <= next_drone_coords[0] < M and 0 <= next_drone_coords[1] < N):
+    if not (0 <= next_drone_coords[0] < const.M and 0 <= next_drone_coords[1] < const.N):
         return True
     
     # case 3: if drone collides with static drone along path, return True        
     drone_path_coords = bresenham(curr_drone_coords, next_drone_coords)   # list of tuples
     drone_path_set = set(drone_path_coords)
-    obs_coords_set = set(map(tuple, obs_coords))
+    obs_coords_set = set(map(tuple, const.DRONE_POS))
     return len(drone_path_set.intersection(obs_coords_set)) > 0
 
 
@@ -190,7 +360,7 @@ def compute_swan_movement(drone_coords: np.ndarray, swan_coords: np.ndarray) -> 
         drone_coords (np.ndarray): The drone coordinates.
         swan_coords (np.ndarray): The swan coordinates.
     Returns:
-        np.ndarray: The swan movement.
+        np.ndarray: The resulting new swan coordinates.
     """
     # get drone and swan coordinates
     dx, dy = drone_coords
@@ -231,14 +401,15 @@ def print_constants(c: Constants):
     print("K:", c.K)
     print("INPUT_SPACE:", c.INPUT_SPACE)
     print("L:", c.L)
-    # print("THRUSTER_COST:", c.THRUSTER_COST)
-    # print("TIME_COST:", c.TIME_COST)
-    # print("DRONE_COST:", c.DRONE_COST)
-    # print("SWAN_PROB:", c.SWAN_PROB)
-    # print("CURRENT_PROB:", c.CURRENT_PROB)
-    # print("FLOW_FIELD:", c.FLOW_FIELD)
+    print("THRUSTER_COST:", c.THRUSTER_COST)
+    print("TIME_COST:", c.TIME_COST)
+    print("DRONE_COST:", c.DRONE_COST)
+    print("SWAN_PROB:", c.SWAN_PROB)
+    print("CURRENT_PROB:", c.CURRENT_PROB)
+    print("FLOW_FIELD:", c.FLOW_FIELD)
     print("="*100)
     print("")
+
 
 class SingletonMeta(type):
     """
