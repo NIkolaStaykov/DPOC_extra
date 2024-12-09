@@ -27,6 +27,7 @@ from Solver import solution
 
 if __name__ == "__main__":
     n_tests = 4
+    total_times = np.zeros(n_tests)
     for i in range(n_tests):
         print("-----------")
         print("Test " + str(i))
@@ -68,5 +69,3 @@ if __name__ == "__main__":
             passed = False
         else:
             print("Correct optimal cost")
-
-    print("-----------")

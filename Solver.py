@@ -21,22 +21,6 @@
 import numpy as np
 from utils import *
 
-
-def initialize_policy(constants: Constants) -> np.array:
-    """Initializes the policy.
-    Args:
-        Constants: The constants describing the problem instance.
-    Returns:
-        np.array: The initial policy.
-    """
-    # admissible_actions = compute_admissible_actions(Constants)
-    # policy = []
-    # # Random initial policy
-    # for state in range(Constants.K):
-    #     policy[state] = np.random.choice(list(admissible_actions[state]))
-    return np.zeros(constants.K, dtype=int)
-
-
 def solution(P, Q, Constants):
     """Computes the optimal cost and the optimal control input for each
     state of the state space solving the stochastic shortest
@@ -63,46 +47,18 @@ def solution(P, Q, Constants):
 
     """
     # Constants
-    policy = initialize_policy(Constants)
-    cost_func = np.zeros(Constants.K)
-
-    epsilon = 1e-3
-    last_policy = np.ones(Constants.K) * -1
-
-    while not np.all(policy == last_policy):
-        
-        last_policy = policy.copy()
-        # Update value function, policy is fixed
-        old_cost_func = cost_func.copy()
-        delta = np.inf
-
-        while delta > epsilon:
-            for state in range(Constants.K):
-                action = policy[state]
-                expected_stage_cost = Q[state][action]
-                transition_probs = P[state, :, action]
-                state_cost = expected_stage_cost + np.dot(transition_probs, cost_func)
-                cost_func[state] = state_cost
-
-            delta = np.max(np.abs(old_cost_func - cost_func))
-            old_cost_func = cost_func.copy()
-
-        # Update policy, cost function is fixed
-        old_policy = np.ones(Constants.K) * -1
-        while not np.all(policy == old_policy):
-            old_policy = policy.copy()
-            for state in range(Constants.K):
-                best_action = None
-                best_cost = -np.inf
-
-                for action in range(Constants.L):
-                    transition_probs = P[state, :, action]
-                    current_cost = Q[state][action] + np.dot(transition_probs, cost_func)
-                    if current_cost < best_cost:
-                        best_cost = current_cost
-                        best_action = action
-
-                policy[state] = best_action
+    policy = np.zeros(Constants.K, dtype=int)
+    value_func = np.zeros(Constants.K)
+    
+    # find optimal cost using linear programming
+    alpha = 0.99999       # discount factor
+    value_func = linear_program(P, Q, Constants, alpha)
+    
+    # find the optimal policy
+    P_transposed = np.transpose(P, (0, 2, 1))
+    costs = Q + alpha * (P_transposed @ value_func)
+    
+    policy = np.argmin(costs, axis=1)
 
     # The policy converged, it is now optimal
-    return cost_func, policy
+    return value_func, policy
